@@ -1,0 +1,22 @@
+<!DOCTYPE HTML>
+<body>
+<script>
+var T = 0.5;
+try {
+  var ctx = new AudioContext();
+} catch (e) {
+  ctx = new webkitAudioContext();
+}
+
+//alert(ctx.currentTime);
+//alert(ctx.currentTime);
+
+var src = ctx.createBufferSource();
+src.connect(ctx.destination);
+src.start(0);
+
+setTimeout(function() {
+  alert(ctx.currentTime);
+}, 500);
+
+</script>

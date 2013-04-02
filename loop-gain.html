@@ -1,0 +1,31 @@
+<!DOCTYPE HTML>
+<body>
+<script>
+var T = 0.5;
+try {
+  var ctx = new AudioContext();
+} catch (e) {
+  ctx = new webkitAudioContext();
+}
+var node;
+var xhr = new XMLHttpRequest();
+xhr.open("GET", "ting.ogg", true);
+xhr.responseType = "arraybuffer";
+xhr.onload = function() {
+  ctx.decodeAudioData(xhr.response, function(buffer) {
+    var length = buffer.duration;
+    node = ctx.createBufferSource();
+    node.buffer = buffer;
+    node.loopStart = length/3;//length/2;
+    node.loopEnd = length*2/3;
+    node.loop = true;
+    var gain = ctx.createGain();
+    gain.gain.linearRampToValueAtTime(0.3, 10);
+    node.connect(gain);
+    gain.connect(ctx.destination);
+    node.start(1, length*3/4);
+  }, function() { alert('decode error!'); });
+};
+xhr.send();
+</script>
+<button onclick="node.stop(0);">Stop</button>

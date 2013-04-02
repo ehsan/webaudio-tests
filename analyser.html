@@ -1,0 +1,32 @@
+<!DOCTYPE HTML>
+<body>
+<script>
+var T = 0.5;
+try {
+  var ctx = new AudioContext();
+} catch (e) {
+  ctx = new webkitAudioContext();
+}
+var buffers = [];
+for (var i = 0; i < 10; ++i) {
+  var channels = 1;
+  var buffer = ctx.createBuffer(channels, T*ctx.sampleRate, ctx.sampleRate);
+  var f = 3000 + (i*100);
+  for (var j = 0; j < buffer.length; ++j) {
+    var sample = Math.sin((j/ctx.sampleRate)*Math.PI*2*f);
+	for (var c = 0; c < channels; ++c) {
+      buffer.getChannelData(c)[j] = sample;
+	}
+  }
+  buffers[i] = buffer;
+}
+
+for (var i = 0; i < 1; ++i) {
+  var node = ctx.createBufferSource();
+  node.buffer = buffers[i%buffers.length];
+  //node.start(i*T/2);
+  var analyser = ctx.createAnalyser();
+  node.connect(analyser);
+  analyser.connect(ctx.destination);
+}
+</script>

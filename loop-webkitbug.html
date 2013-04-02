@@ -1,0 +1,36 @@
+<!DOCTYPE HTML>
+<body>
+<script>
+var T = 0.5;
+var node = null;
+function test(reproduceBug) {
+var xhr = new XMLHttpRequest();
+xhr.open("GET", "ting.ogg", true);
+xhr.responseType = "arraybuffer";
+xhr.onload = function() {
+  try {
+    var ctx = new AudioContext();
+  } catch (e) {
+    ctx = new webkitAudioContext();
+  }
+  ctx.decodeAudioData(xhr.response, function(buffer) {
+    node = ctx.createBufferSource();
+    node.buffer = buffer;
+    node.loop = true;
+    node.connect(ctx.destination);
+    var length = buffer.duration;
+    if (reproduceBug) {
+      node.start(1, length/2, length/10);
+    } else {
+      node.start(1, length/2);
+    }
+  }, function() { alert('decode error!'); });
+};
+xhr.send();
+}
+</script>
+<button onclick="if(node)node.stop(0);test(true);">Reproduce WebKit bug</button>
+<button onclick="if(node)node.stop(0);test(false);">Playback without the duration argument</button>
+<button onclick="if(node)node.stop(0);">Stop</button>
+<br>
+<a href="https://bugs.webkit.org/show_bug.cgi?id=111952">WebKit bug 111952</a>
