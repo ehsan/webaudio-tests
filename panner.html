@@ -1,0 +1,338 @@
+<!DOCTYPE HTML>
+<meta charset="utf-8">
+<style>
+canvas {
+  border: 1px solid red;
+  margin: 0 auto;
+  display: block;
+}
+label {
+  display: block;
+}
+</style>
+<body>
+<button onclick="start(); node.playbackRate.value = 4;">pbr</button>
+Position: <div id=pos> </div>
+<canvas width=499 height=499>
+</canvas>
+<button id=start>Start</button>
+<div id=currentTime>00:00</div>
+<label>
+  Channels
+  <select id=files-channels>
+    <option>mono</option>
+    <option>stereo</option>
+  </select>
+</label>
+<label>
+  Scale factor
+  <input id=scale type=range min=1 max=100 value=50>
+  </input>
+  <output id=scalevalue>
+  50
+  </output>
+</label>
+<label>
+  AudioBufferSource playbackRate
+  <input id=playbackRate type=range min=0.1 max=4 value=1, step=0.1>
+  </input>
+  <output id=playbackRateValue>
+  50
+  </output>
+</label>
+<label>
+  Outer gain cone
+  <input id=outer type=range min=0 max=360 value=360>
+  </input>
+  <output id=outervalue>
+  360
+  </output>
+</label>
+<label>
+  Inner gain cone
+  <input id=inner type=range min=0 max=360 value=360>
+  </input>
+  <output id=innervalue>
+  360
+  </output>
+</label>
+<label>
+  Distance model
+  <select id=distanceModel>
+    <option>linear</option>
+    <option>inverse</option>
+    <option>exponential</option>
+  </select>
+</label>
+<script>
+
+var ctx,
+    node,
+    panner,
+    pos = document.getElementById("pos"),
+    canvas = document.getElementsByTagName("canvas")[0],
+    c = canvas.getContext("2d"),
+    x, y,
+    buffers = [],
+    channels = 2,
+    buffer,
+    scale = 50,
+    sourceOrientation = {x: 1, y: 0, z: 0},
+    sourcePosition = {x:0, y:0, z:0},
+    file = "think-looped-",
+    fileformat = "wav",
+    gain1,
+    gain2;
+
+function getFile(url) {
+    var request = new XMLHttpRequest();
+    request.open("GET", url, true);
+    request.responseType = "arraybuffer";
+
+    request.onload = function() {
+      ctx.decodeAudioData(request.response, function(data) {
+        node.buffer = data;
+        //node.playbackRate.value = 0.5;
+        node.start(0);
+      }, function() {
+        alert("decodeAudioData error");
+      });
+    }
+
+    request.send();
+}
+
+document.addEventListener("keypress", function(e) {
+  if (e.charCode == 32) {
+    toggle(document.getElementById("start"));
+  }
+});
+
+function setup(filename) {
+  var T = 0.5;
+
+  stop();
+
+  try {
+    ctx = new AudioContext();
+  } catch (e) {
+    ctx = new webkitAudioContext();
+  }
+
+  panner = ctx.createPanner();
+  gain1 = ctx.createGain();
+  gain2 = ctx.createGain();
+  sourcePosition = {x: canvas.width / 2,
+                    y: 0,
+                    z: canvas.height / 2};
+  panner.setPosition(sourcePosition.x, sourcePosition.y, sourcePosition.z);
+  panner.setOrientation(sourceOrientation.x, sourceOrientation.y, sourceOrientation.z);
+  panner.panningModel = "equalpower";
+  panner.distanceModel = document.getElementById("distanceModel").value;
+
+  node = ctx.createBufferSource();
+  node.loop = true;
+  node.connect(gain1);
+  gain1.connect(gain2);
+ // gain2.connect(node);
+  gain2.connect(panner);
+  panner.connect(ctx.destination);
+
+  getFile(filename);
+}
+
+
+document.getElementById("scale").addEventListener("input", function(e) {
+  var t = e.target;
+  scale = t.value;
+  document.getElementById("scalevalue").innerHTML = t.value;
+});
+
+document.getElementById("playbackRate").addEventListener("input", function(e) {
+  var t = e.target;
+  if (node) {
+    node.playbackRate.value = t.value;
+  }
+  document.getElementById("playbackRateValue").innerHTML = t.value;
+});
+
+function getFileName() {
+  var v = document.getElementById("files-channels").value;
+  return (file + v + "." + fileformat);
+}
+
+document.getElementById("files-channels").addEventListener("change", function(e) {
+  setup(getFileName());
+});
+
+document.getElementById("inner").addEventListener("input", function(e) {
+  var t = e.target;
+  if (panner) {
+    panner.coneInnerAngle = t.value;
+  }
+  document.getElementById("innervalue").innerHTML = t.value;
+});
+
+document.getElementById("outer").addEventListener("input", function(e) {
+  var t = e.target;
+  if (panner) {
+    panner.coneOuterAngle = t.value;
+  }
+  document.getElementById("outervalue").innerHTML = t.value;
+});
+
+
+document.getElementById("distanceModel").addEventListener("change", function(e) {
+  var t = e.target;
+  panner.distanceModel = t.value;
+});
+
+function isPlaying() {
+  return node && node.playbackState == node.PLAYING_STATE;
+}
+
+function stop() {
+  if (isPlaying()) {
+    node.stop();
+    ctx = null;
+    node = null;
+    panner = null;
+    document.getElementById("start").innerHTML = "Start";
+  }
+}
+
+function start() {
+  if (!isPlaying()) {
+    document.getElementById("start").innerHTML = "Stop";
+    setup(getFileName());
+  }
+}
+
+function toggle(t) {
+  if (isPlaying()) {
+    stop();
+  } else {
+    start();
+  }
+}
+
+document.getElementById("start").addEventListener("click", function(e) {
+  var t = e.target;
+  toggle(t);
+});
+
+
+canvas.addEventListener("mousemove", function(e) {
+  x = e.clientX - e.target.offsetLeft;
+  y = e.clientY - e.target.offsetTop;
+
+  posx = (canvas.width - x);
+  posy = (canvas.height - y);
+
+  if (ctx) {
+    ctx.listener.setPosition(posy, 0, posx);
+  }
+  pos.innerHTML = (posx) + " " + (posy);
+});
+
+var raf = window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame;
+
+raf(renderLoop);
+
+function deg2rad(deg) {
+  return deg * Math.PI / 180;
+}
+
+function rad2deg(rad) {
+  return rad * 180 / Math.PI;
+}
+
+function drawCone(x, y, angle, color) {
+  var orientationAngle =  Math.atan2(sourceOrientation.x, sourceOrientation.z);
+  var startdeg = orientationAngle - (angle / 2);
+  var enddeg = orientationAngle + (angle / 2);
+  var start = orientationAngle - deg2rad(angle / 2);
+  var end = orientationAngle + deg2rad(angle / 2);
+  c.beginPath();
+  c.fillStyle = color;
+  c.moveTo(x, y);
+  c.arc(x, y, canvas.width / 2 * Math.sqrt(2), start + Math.PI / 2, end + Math.PI / 2);
+  c.fill();
+  c.closePath();
+}
+
+function renderLoop() {
+  if (isPlaying()) {
+    document.getElementById("currentTime").innerHTML = ctx.currentTime;
+  } else {
+    document.getElementById("currentTime").innerHTML = "0";
+  }
+  c.clearRect(0, 0, canvas.width, canvas.height);
+  c.save();
+  // transform the space to be similar to the 3d panner space: 3*pi/2 rotation
+  // so that x goes up and z goes right
+  //c.scale(1/scale, 1/scale);
+
+  c.fillStyle = "rgba(255, 255, 255, 1)";
+  c.strokeStyle = "rgba(128, 128, 128, 0.4)";
+  c.lineWidth = 1;
+
+  // cross
+  c.beginPath();
+  c.moveTo(-canvas.height, sourcePosition.x);
+  c.lineTo(canvas.height, sourcePosition.x);
+  c.stroke();
+
+  c.beginPath();
+  c.moveTo(sourcePosition.z, -canvas.width);
+  c.lineTo(sourcePosition.z, canvas.width);
+  c.stroke();
+
+  // source
+  c.fillStyle = "rgba(255, 0, 0, 1)";
+  c.fillRect(sourcePosition.x - 2, sourcePosition.z - 2, 4, 4);
+
+  // orientation vector for the source
+//  c.strokeStyle = "rgba(128, 128, 128, 1)";
+//  c.beginPath();
+//  c.moveTo(sourcePosition.x, sourcePosition.z);
+//  magnitude = Math.sqrt(sourceOrientation.x * sourceOrientation.x +
+//                        sourceOrientation.z * sourceOrientation.z);
+//  normalized = { x : sourceOrientation.x/magnitude,
+//                 z : sourceOrientation.z/magnitude };
+//  c.lineWidth = 3;
+//  console.log(normalized.x, normalized.z);
+//  console.log(sourceOrientation.x, sourceOrientation.z);
+//  c.lineTo((normalized.x - sourcePosition.x) * 30, (normalized.z - sourcePosition.z) * 30);
+//  c.stroke();
+//  c.closePath();
+
+  // c.translate(canvas.width / 2, canvas.height / 2);
+  // c.rotate(3 * Math.PI / 2);
+
+
+  // gain cones
+  if (panner) {
+    drawCone(sourcePosition.x, sourcePosition.z,
+        panner.coneInnerAngle, "rgba(0, 255, 0, 0.4)");
+    drawCone(sourcePosition.x, sourcePosition.z,
+        panner.coneOuterAngle, "rgba(0, 0, 255, 0.4)");
+  }
+
+  var cmt = c.currentTransform;
+  c.restore();
+
+  // listener
+  c.fillStyle = "rgba(0, 255, 0, 1)";
+  c.fillRect(x - 5, y - 5, 10, 10);
+
+  c.currentTransform = cmt;
+
+  //c.restore();
+  raf(renderLoop);
+}
+
+document.addEventListener("load", function(){start();});
+window.addEventListener("beforeunload", stop);
+
+</script>

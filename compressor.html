@@ -7,26 +7,94 @@ try {
 } catch (e) {
   ctx = new webkitAudioContext();
 }
-var buffers = [];
-for (var i = 0; i < 10; ++i) {
-  var channels = 1;
-  var buffer = ctx.createBuffer(channels, T*ctx.sampleRate, ctx.sampleRate);
-  var f = 3000 + (i*100);
-  for (var j = 0; j < buffer.length; ++j) {
-    var sample = Math.sin((j/ctx.sampleRate)*Math.PI*2*f);
-	for (var c = 0; c < channels; ++c) {
-      buffer.getChannelData(c)[j] = sample;
-	}
-  }
-  buffers[i] = buffer;
-}
 
-for (var i = 0; i < 10; ++i) {
+var buffer;
+var xhr = new XMLHttpRequest();
+xhr.open("GET", "think.ogg", true);
+xhr.responseType = "arraybuffer";
+xhr.send();
+xhr.onload = function() {
+  ctx.decodeAudioData(xhr.response, function(data) {
+    buffer = data;
+    load();
+  }, function() {
+    alert('Error decoding the audio buffer');
+  });
+};
+
+var src, comp;
+function play() {
   var node = ctx.createBufferSource();
-  node.buffer = buffers[i%buffers.length];
-  node.start(i*T/2);
-  var comp = ctx.createDynamicsCompressor();
+  src = node;
+  node.buffer = buffer;
+  node.loop = true;
+  node.start(0);
+  comp = ctx.createDynamicsCompressor();
+  comp.threshold.setValueAtTime(-90, 0);
+  comp.threshold.linearRampToValueAtTime(-10, 10);
+  comp.threshold.linearRampToValueAtTime(-100, 15);
+  comp.threshold.linearRampToValueAtTime(-24, 20);
+  comp.knee.setValueAtTime(1, 0);
+  comp.knee.linearRampToValueAtTime(10, 20);
+  comp.ratio.setValueAtTime(20, 0);
+  comp.ratio.exponentialRampToValueAtTime(1, 100);
+  comp.attack.setValueAtTime(1, 0);
+  comp.attack.exponentialRampToValueAtTime(0.001, 20);
+  comp.release.setValueAtTime(0.001, 0);
+  comp.release.linearRampToValueAtTime(1, 30);
   node.connect(comp);
   comp.connect(ctx.destination);
 }
+
+var raf = window.requestAnimationFrame ||
+          window.mozRequestAnimationFrame ||
+          window.webkitRequestAnimationFrame;
+var anim;
+function toggle() {
+  if (button.textContent == "Play") {
+    button.textContent = "Stop";
+    play();
+    if (!anim) {
+      anim = function() {
+        paintCanvas();
+        if (anim) {
+          raf(anim);
+        }
+      };
+      raf(anim);
+    }
+  } else {
+    button.textContent = "Play";
+    src.stop(0);
+    anim = null;
+  }
+}
+
+function getValue() {
+  return (comp.reduction.value + 100) * 2.56;
+}
+
+var counter = 1024;
+function paintCanvas() {
+  if (counter == 1024) {
+    canvas.beginPath();
+    canvas.moveTo(0, 256 - getValue());
+    counter = 0;
+  } else {
+    ++counter;
+    canvas.lineTo(counter, 256 - getValue());
+    canvas.stroke();
+  }
+}
+
+var canvas, button;
+function load() {
+  canvas = document.querySelector("canvas").getContext("2d");
+  button = document.createElement("button");
+  button.textContent = "Play";
+  button.onclick = toggle;
+  document.querySelector("canvas").parentNode.appendChild(button);
+}
+
 </script>
+<canvas width=1024 height=256></canvas><br>
