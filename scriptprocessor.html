@@ -1,0 +1,81 @@
+<!DOCTYPE HTML>
+<body>
+<div id="input">input<br></div>
+<div id="output">output<br></div>
+<script>
+var T = 0.5;
+var N = 1;
+try {
+  var ctx = new AudioContext();
+} catch (e) {
+  ctx = new webkitAudioContext();
+}
+var buffers = [];
+for (var i = 0; i < N; ++i) {
+  var channels = 2;
+  var buffer = ctx.createBuffer(channels, T*ctx.sampleRate, ctx.sampleRate);
+  var f = 3000 + (i*100);
+  for (var j = 0; j < buffer.length; ++j) {
+    //var sample = Math.sin((j/ctx.sampleRate)*Math.PI*2*f);
+    var sample = j;// ((j)%10)/10;
+	for (var c = 0; c < channels; ++c) {
+      buffer.getChannelData(c)[j] = sample;
+	}
+  }
+  buffers[i] = buffer;
+}
+
+var input = document.getElementById("input");
+var output = document.getElementById("output");
+
+var ctr=0;
+
+for (var i = 0; i < N; ++i) {
+  var node = ctx.createBufferSource();
+  node.buffer = buffers[i%buffers.length];
+  node.start(i*T/2);
+  //node.stop(i*T/2+T);
+  var sp = ctx.createScriptProcessor(4096);
+  node.connect(sp);
+  sp.connect(ctx.destination);
+  window.prevDelay=-1;
+  sp.onaudioprocess = function(e) {
+    if (e.inputBuffer.getChannelData(0)[0] == 0 &&
+        e.inputBuffer.getChannelData(0)[1] == 0 &&
+        e.inputBuffer.getChannelData(0)[2] == 0 &&
+        e.inputBuffer.getChannelData(0)[3] == 0 &&
+        e.inputBuffer.getChannelData(0)[4] == 0 &&
+        e.inputBuffer.getChannelData(0)[5] == 0 &&
+        e.inputBuffer.getChannelData(0)[6] == 0) {
+      sp.onaudioprocess = null;
+      return;
+    }
+    if (e.playbackTime <= window.prevDelay) {
+      alert('wtf?');
+    }
+    window.prevDelay = e.playbackTime;
+    console.log(e.playbackTime);
+    for (var i = 0; i < e.inputBuffer.numberOfChannels; ++i) {
+      s = "Channel[" + i + "] = {";
+      for (var j = 0; j < e.inputBuffer.getChannelData(i).length; ++j) {
+        s += e.inputBuffer.getChannelData(i)[j] + ",";
+      }
+      s+= ";";
+      var pre = document.createElement("pre");
+      pre.appendChild(document.createTextNode(s));
+      input.appendChild(pre);
+    }
+    for (var i = 0; i < e.outputBuffer.numberOfChannels; ++i) {
+      s = "Channel[" + i + "] = {";
+      for (var j = 0; j < e.outputBuffer.getChannelData(i).length; ++j) {
+        s += (e.outputBuffer.getChannelData(i)[j] = Math.sin((window.ctr++/ctx.sampleRate)*Math.PI*2*3000)) + ",";
+        //e.outputBuffer.getChannelData(i)[j] = Math.sin((window.ctr++/ctx.sampleRate)*Math.PI*2*3000);
+      }
+      s+= ";";
+      var pre = document.createElement("pre");
+      pre.appendChild(document.createTextNode(s));
+      output.appendChild(pre);
+    }
+  };
+}
+</script>
