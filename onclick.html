@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+  <script>
+    if (window.webkitAudioContext) {
+      var ac = new webkitAudioContext();
+    } else {
+      var ac = new AudioContext();
+    }
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "ting.ogg", true);
+    xhr.responseType = "arraybuffer";
+    xhr.send();
+    xhr.onload = function() {
+      ac.decodeAudioData(xhr.response, function(buffer) {
+        window.buffer = buffer;
+        document.querySelector("button").style.display = "";
+      });
+    };
+
+    function play() {
+      var src = ac.createBufferSource();
+      src.buffer = buffer;
+      src.start(ac.currentTime);
+      src.connect(ac.destination);
+    }
+  </script>
+  <body>
+    <button onmousedown="play()" style="display: none">play</button>
+  </body>
+</html>
