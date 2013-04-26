@@ -1,32 +1,132 @@
 <!DOCTYPE HTML>
 <body>
 <script>
-var T = 0.5;
 try {
   var ctx = new AudioContext();
 } catch (e) {
   ctx = new webkitAudioContext();
 }
-var buffers = [];
-for (var i = 0; i < 10; ++i) {
-  var channels = 1;
-  var buffer = ctx.createBuffer(channels, T*ctx.sampleRate, ctx.sampleRate);
-  var f = 3000 + (i*100);
-  for (var j = 0; j < buffer.length; ++j) {
-    var sample = Math.sin((j/ctx.sampleRate)*Math.PI*2*f);
-	for (var c = 0; c < channels; ++c) {
-      buffer.getChannelData(c)[j] = sample;
-	}
-  }
-  buffers[i] = buffer;
+
+var buffer;
+var xhr = new XMLHttpRequest();
+xhr.open("GET", "think.ogg", true);
+xhr.responseType = "arraybuffer";
+xhr.send();
+xhr.onload = function() {
+  ctx.decodeAudioData(xhr.response, function(data) {
+    buffer = data;
+    load();
+  }, function() {
+    alert('Error decoding the audio buffer');
+  });
+};
+
+var src, volume, analyser;
+var biquad;
+function play() {
+  src = ctx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+  volume = ctx.createGain();
+  src.connect(volume);
+  biquad = ctx.createBiquadFilter();
+  volume.connect(biquad);
+  analyser = ctx.createAnalyser();
+  biquad.connect(analyser);
+  analyser.fftSize = 2048;
+  analyser.connect(ctx.destination);
+  src.start(0);
 }
 
-for (var i = 0; i < 10; ++i) {
-  var node = ctx.createBufferSource();
-  node.buffer = buffers[i%buffers.length];
-  node.start(i*T/2);
-  var biquad = ctx.createBiquadFilter();
-  node.connect(biquad);
-  biquad.connect(ctx.destination);
+var raf = window.requestAnimationFrame ||
+          window.mozRequestAnimationFrame ||
+          window.webkitRequestAnimationFrame;
+var anim;
+function toggle() {
+  if (button.textContent == "Play") {
+    button.textContent = "Stop";
+    play();
+    if (!anim) {
+      anim = function() {
+        paintCanvas();
+        if (anim) {
+          raf(anim);
+        }
+      };
+      raf(anim);
+    }
+  } else {
+    button.textContent = "Play";
+    src.stop(0);
+    anim = null;
+  }
 }
+
+function paintCanvas() {
+  canvas.clearRect(0, 0, 1024, 256);
+  canvas2.clearRect(0, 0, 1024, 256);
+  var data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  var data2 = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data2);
+  for (var i = 0; i < data.length; ++i) {
+    canvas.beginPath();
+    canvas.moveTo(i, 256);
+    canvas.lineTo(i, 256 - data[i]);
+    canvas.stroke();
+  }
+  canvas2.beginPath();
+  canvas2.moveTo(0, 256 - data2[0]);
+  for (var i = 2; i < data2.length; i += 2) {
+    canvas2.lineTo(Math.floor(i/2), 256 - data2[i]);
+  }
+  canvas2.stroke();
+}
+
+var canvas, canvas2, button;
+function load() {
+  canvas = document.querySelector("canvas").getContext("2d");
+  canvas2 = document.querySelectorAll("canvas")[1].getContext("2d");
+  button = document.createElement("button");
+  button.textContent = "Play";
+  button.onclick = toggle;
+  document.querySelector("canvas").parentNode.appendChild(button);
+}
+
+function updateFilter(name) {
+  biquad.type = name;
+}
+
+function updateFreq(value) {
+  biquad.frequency.value = value;
+}
+
+function updateQ(value) {
+  biquad.Q.value = value;
+}
+
+function updateGain(value) {
+  biquad.gain.value = value;
+}
+
+function updateDetune(value) {
+  biquad.detune.value = value;
+}
+
 </script>
+<canvas width=1024 height=256></canvas><br>
+<canvas width=1024 height=256></canvas><br>
+Type: <select onchange="updateFilter(this.options[this.selectedIndex].textContent)">
+  <option selected>lowpass</option>
+  <option>highpass</option>
+  <option>bandpass</option>
+  <option>lowshelf</option>
+  <option>highshelf</option>
+  <option>peaking</option>
+  <option>notch</option>
+  <option>allpass</option>
+</select>
+Frequency: <input onchange="updateFreq(this.value)" value="350">
+Q: <input onchange="updateQ(this.value)" value="1">
+Gain: <input onchange="updateGain(this.value)" value="0">
+Detune: <input onchange="updateDetune(this.value)" value="0">
