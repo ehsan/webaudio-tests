@@ -62,9 +62,15 @@ function toggle() {
   }
 }
 
+var freqs = new Float32Array(1024);
+for (var f = 0, i = 0; f < ctx.sampleRate; ++i, f += 5) {
+  freqs[i] = f;
+}
+
 function paintCanvas() {
   canvas.clearRect(0, 0, 1024, 256);
   canvas2.clearRect(0, 0, 1024, 256);
+  canvas3.clearRect(0, 0, 1024, 256);
   var data = new Uint8Array(analyser.frequencyBinCount);
   analyser.getByteFrequencyData(data);
   var data2 = new Uint8Array(analyser.fftSize);
@@ -81,12 +87,22 @@ function paintCanvas() {
     canvas2.lineTo(Math.floor(i/2), 256 - data2[i]);
   }
   canvas2.stroke();
+  var mag = new Float32Array(1024),
+      phase = new Float32Array(1024);
+  biquad.getFrequencyResponse(freqs, mag, phase);
+  for (var i = 0; i < mag.length; ++i) {
+    canvas3.beginPath();
+    canvas3.moveTo(i, 256);
+    canvas3.lineTo(i, 256 - mag[i] * 256);
+    canvas3.stroke();
+  }
 }
 
-var canvas, canvas2, button;
+var canvas, canvas2, canvas3, button;
 function load() {
   canvas = document.querySelector("canvas").getContext("2d");
   canvas2 = document.querySelectorAll("canvas")[1].getContext("2d");
+  canvas3 = document.querySelectorAll("canvas")[2].getContext("2d");
   button = document.createElement("button");
   button.textContent = "Play";
   button.onclick = toggle;
@@ -114,6 +130,7 @@ function updateDetune(value) {
 }
 
 </script>
+<canvas width=1024 height=256></canvas><br>
 <canvas width=1024 height=256></canvas><br>
 <canvas width=1024 height=256></canvas><br>
 Type: <select onchange="updateFilter(this.options[this.selectedIndex].textContent)">
