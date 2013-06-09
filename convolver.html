@@ -48,11 +48,6 @@ function play() {
   analyser.fftSize = 2048;
   analyser.connect(ctx.destination);
   src.start(0);
-
-
-  var sp = ctx.createScriptProcessor(2048);
-  convolver.connect(sp);
-  sp.onaudioprocess = function(e) { console.log(e.inputBuffer.getChannelData(0)); sp.onaudioprocess=null; };
 }
 
 var raf = window.requestAnimationFrame ||
