@@ -1,0 +1,104 @@
+<!DOCTYPE HTML>
+<body>
+<script>
+try {
+  var ctx = new AudioContext();
+} catch (e) {
+  ctx = new webkitAudioContext();
+}
+
+function ramp(t) {
+  var V0 = 1;
+  var V1 = 0.1;
+  var T0 = 0;
+  var T1 = 1;
+  return V0 * Math.pow(V1 / V0, (t - T0) / (T1 - T0));
+}
+function generateImpulse() {
+  var buf = ctx.createBuffer(2, 48000, 48000);
+  var f = 400;
+  for (var i = 0; i < buf.length; ++i) {
+    var sample = Math.sin(i/buf.sampleRate*Math.PI*2*f) * ramp(i/buf.sampleRate);
+    for (var j = 0; j < buf.numberOfChannels; ++j) {
+      buf.getChannelData(j)[i] = sample;
+    }
+  }
+  return buf;
+}
+
+onload = load;
+
+var src, volume, convolver, analyser;
+function play() {
+  src = ctx.createMediaElementSource(document.querySelector("audio"));
+  volume = ctx.createGain();
+  src.connect(volume);
+  convolver = ctx.createConvolver();
+  //convolver.buffer = generateImpulse();
+  convolver.normalize = false;
+  volume.connect(convolver);
+  analyser = ctx.createAnalyser();
+  convolver.connect(analyser);
+  analyser.fftSize = 2048;
+  analyser.connect(ctx.destination);
+}
+
+var raf = window.requestAnimationFrame ||
+          window.mozRequestAnimationFrame ||
+          window.webkitRequestAnimationFrame;
+var anim;
+function toggle() {
+  if (button.textContent == "Play") {
+    button.textContent = "Stop";
+    play();
+    if (!anim) {
+      anim = function() {
+        paintCanvas();
+        if (anim) {
+          raf(anim);
+        }
+      };
+      raf(anim);
+    }
+  } else {
+    button.textContent = "Play";
+    src.stop(0);
+    anim = null;
+  }
+}
+
+function paintCanvas() {
+  canvas.clearRect(0, 0, 1024, 256);
+  canvas2.clearRect(0, 0, 1024, 256);
+  var data = new Uint8Array(analyser.frequencyBinCount);
+  analyser.getByteFrequencyData(data);
+  var data2 = new Uint8Array(analyser.fftSize);
+  analyser.getByteTimeDomainData(data2);
+  for (var i = 0; i < data.length; ++i) {
+    canvas.beginPath();
+    canvas.moveTo(i, 256);
+    canvas.lineTo(i, 256 - data[i]);
+    canvas.stroke();
+  }
+  canvas2.beginPath();
+  canvas2.moveTo(0, 256 - data2[0]);
+  for (var i = 2; i < data2.length; i += 2) {
+    canvas2.lineTo(Math.floor(i/2), 256 - data2[i]);
+  }
+  canvas2.stroke();
+}
+
+var canvas, canvas2, button;
+function load() {
+  canvas = document.querySelector("canvas").getContext("2d");
+  canvas2 = document.querySelectorAll("canvas")[1].getContext("2d");
+  button = document.createElement("button");
+  button.textContent = "Play";
+  button.onclick = toggle;
+  document.querySelector("canvas").parentNode.appendChild(button);
+}
+
+</script>
+<audio controls src="04-diffused_beats-49_percent.ogg"></audio>
+<canvas width=1024 height=256></canvas><br>
+<canvas width=1024 height=256></canvas><br>
