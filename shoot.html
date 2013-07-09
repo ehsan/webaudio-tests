@@ -1,0 +1,40 @@
+<!DOCTYPE HTML>
+<script>
+onload= function() {
+// Load the sound file from the network
+var decodedBuffer;
+var ctx = new AudioContext();
+var xhr = new XMLHttpRequest();
+xhr.open("GET", "ting.ogg", true);
+xhr.responseType = "arraybuffer";
+xhr.send();
+xhr.onload = function() {
+  // At this point, xhr.response contains the encoded data for gunshot.ogg,
+  // so let's decode it into an AudioBuffer first.
+  ctx.decodeAudioData(xhr.response, function onDecodeSuccess(buffer) {
+    decodedBuffer = buffer;
+  }, function onDecodeFailure() { alert('decode error!'); });
+};
+
+// Set up a mousedown/mouseup handler on your game canvas
+var canvas = document;
+canvas.addEventListener("mousedown", function onMouseDown() {
+console.log("mouse down");
+  var src = ctx.createBufferSource();
+  src.buffer = decodedBuffer;                                      // play back the decoded buffer
+  src.loop = true;                                                 // set the sound to loop while the mouse is down
+  var gain = ctx.createGain();                                     // create a gain node in order to create the fade-out effect when the mouse is released
+  src.connect(gain);
+  gain.connect(ctx.destination);
+  canvas.src = src;                                                // save a reference to our nodes to use it later
+  canvas.gain = gain;
+  src.start(0);                                                    // start playback immediately
+}, false);
+canvas.addEventListener("mouseup", function onMouseUp() {
+  var src = canvas.src, gain = canvas.gain;
+  src.stop(ctx.currentTime + 0.6);                                 // set up playback to stop in 200ms
+  gain.gain.setValueAtTime(1.0, ctx.currentTime);
+  gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.6); // set up the sound to fade out within 200ms
+}, false);
+};
+</script>
